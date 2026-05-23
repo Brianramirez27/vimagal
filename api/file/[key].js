@@ -1,6 +1,6 @@
-const { list } = require('@vercel/blob')
+import { list } from '@vercel/blob'
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   const { key } = req.query
   try {
     const { blobs } = await list({ prefix: `${key}.pdf` })

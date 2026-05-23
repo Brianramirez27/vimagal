@@ -1,7 +1,7 @@
-const busboy = require('busboy')
-const { put, list, del } = require('@vercel/blob')
+import busboy from 'busboy'
+import { put, list, del } from '@vercel/blob'
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   const { key } = req.query
 
   if (req.method === 'POST') {
