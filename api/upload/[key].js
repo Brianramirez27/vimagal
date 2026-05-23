@@ -1,39 +1,51 @@
 const multer = require('multer')
-const path = require('path')
-const fs = require('fs')
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, '/tmp'),
-  filename: (req, _file, cb) => cb(null, `${req.query.key}.pdf`),
-})
+const { put, list, del } = require('@vercel/blob')
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === 'application/pdf') cb(null, true)
     else cb(new Error('Solo se permiten archivos PDF'))
   },
-  limits: { fileSize: 50 * 1024 * 1024 },
 })
 
-function handler(req, res) {
+function runMiddleware(req, res, fn) {
+  return new Promise((resolve, reject) => {
+    fn(req, res, (err) => (err ? reject(err) : resolve()))
+  })
+}
+
+module.exports = async function handler(req, res) {
+  const { key } = req.query
+
   if (req.method === 'POST') {
-    upload.single('file')(req, res, (err) => {
-      if (err) return res.status(400).json({ error: err.message })
+    try {
+      await runMiddleware(req, res, upload.single('file'))
       if (!req.file) return res.status(400).json({ error: 'No se recibió archivo' })
-      res.json({ ok: true, name: req.file.originalname })
-    })
+
+      const { blobs } = await list({ prefix: `${key}.pdf` })
+      const existing = blobs.filter((b) => b.pathname === `${key}.pdf`)
+      if (existing.length > 0) await del(existing.map((b) => b.url))
+
+      const blob = await put(`${key}.pdf`, req.file.buffer, {
+        access: 'public',
+        contentType: 'application/pdf',
+      })
+
+      res.json({ ok: true, url: blob.url, name: req.file.originalname })
+    } catch (err) {
+      res.status(400).json({ error: err.message })
+    }
   } else if (req.method === 'DELETE') {
-    const filepath = path.join('/tmp', `${req.query.key}.pdf`)
-    if (fs.existsSync(filepath)) fs.unlinkSync(filepath)
-    res.json({ ok: true })
+    try {
+      const { blobs } = await list({ prefix: `${key}.pdf` })
+      const existing = blobs.filter((b) => b.pathname === `${key}.pdf`)
+      if (existing.length > 0) await del(existing.map((b) => b.url))
+      res.json({ ok: true })
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
   } else {
     res.status(405).json({ error: 'Method not allowed' })
   }
 }
-
-handler.config = {
-  api: { bodyParser: false },
-}
-
-module.exports = handler

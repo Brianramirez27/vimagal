@@ -1,9 +1,16 @@
-const fs = require('fs')
-const path = require('path')
+const { list } = require('@vercel/blob')
 
-module.exports = function handler(req, res) {
+module.exports = async function handler(req, res) {
   const { key } = req.query
-  const filepath = path.join('/tmp', `${key}.pdf`)
-  const exists = fs.existsSync(filepath)
-  res.json({ exists, url: exists ? `/api/download/${key}` : null })
+  try {
+    const { blobs } = await list({ prefix: `${key}.pdf` })
+    const blob = blobs.find((b) => b.pathname === `${key}.pdf`)
+    if (blob) {
+      res.json({ exists: true, url: blob.url })
+    } else {
+      res.json({ exists: false, url: null })
+    }
+  } catch {
+    res.json({ exists: false, url: null })
+  }
 }

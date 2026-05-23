@@ -7,20 +7,22 @@ interface PdfUploaderProps {
 }
 
 export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
-  const fileUrl = `/uploads/${storageKey}.pdf`
+  const [fileUrl, setFileUrl] = useState<string | null>(null)
   const [exists, setExists] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
   const [uploadedName, setUploadedName] = useState('')
 
-  // Check if a file already exists on the server
   useEffect(() => {
     fetch(`/api/file/${storageKey}`)
       .then((r) => r.json())
       .then((data) => {
         setExists(data.exists)
-        if (data.exists) setUploadedName(storageKey)
+        if (data.exists) {
+          setFileUrl(data.url)
+          setUploadedName(storageKey)
+        }
       })
       .catch(() => setExists(false))
   }, [storageKey])
@@ -41,6 +43,7 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
         throw new Error(data.error || 'Error al subir el archivo')
       }
       const data = await res.json()
+      setFileUrl(data.url)
       setUploadedName(data.name ?? file.name)
       setExists(true)
     } catch (e: unknown) {
@@ -53,6 +56,7 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
   const handleRemove = async () => {
     await fetch(`/api/upload/${storageKey}`, { method: 'DELETE' })
     setExists(false)
+    setFileUrl(null)
     setUploadedName('')
     setError(null)
   }
@@ -71,6 +75,7 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
   }
 
   const handleDownload = () => {
+    if (!fileUrl) return
     const link = document.createElement('a')
     link.href = fileUrl
     link.download = `${storageKey}.pdf`
@@ -104,7 +109,7 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
             {/* PDF embed */}
             <div className="rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#222]" style={{ height: '440px' }}>
               <iframe
-                src={`${fileUrl}?t=${Date.now()}`}
+                src={fileUrl ?? ''}
                 className="w-full h-full"
                 title={title}
               />
