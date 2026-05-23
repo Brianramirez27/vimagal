@@ -50,6 +50,7 @@ export default async function handler(req, res) {
           res.json({ ok: true, url: blob.url, name: filename })
           resolve()
         } catch (err) {
+          console.error('[upload] error:', err.message)
           res.status(500).json({ error: err.message })
           resolve()
         }
