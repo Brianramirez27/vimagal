@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     const { blobs } = await list({ prefix: `${key}.pdf` })
     const blob = blobs.find((b) => b.pathname === `${key}.pdf`)
     if (blob) {
-      res.json({ exists: true, url: blob.url })
+      res.json({ exists: true, url: `/api/pdf/${key}` })
     } else {
       res.json({ exists: false, url: null })
     }

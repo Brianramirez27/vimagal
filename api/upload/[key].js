@@ -43,11 +43,11 @@ export default async function handler(req, res) {
           if (existing.length > 0) await del(existing.map((b) => b.url))
 
           const blob = await put(`${key}.pdf`, fileBuffer, {
-            access: 'public',
+            access: 'private',
             contentType: 'application/pdf',
           })
 
-          res.json({ ok: true, url: blob.url, name: filename })
+          res.json({ ok: true, url: `/api/pdf/${key}`, name: filename })
           resolve()
         } catch (err) {
           console.error('[upload] error:', err.message)
