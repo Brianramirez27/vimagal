@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(ping -n 5 127.0.0.1)",
+      "Bash(exit 0)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}
