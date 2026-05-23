@@ -13,6 +13,7 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
   const [error, setError] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
   const [uploadedName, setUploadedName] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
     fetch(`/api/file/${storageKey}`)
@@ -55,6 +56,7 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
 
   const handleRemove = async () => {
     await fetch(`/api/upload/${storageKey}`, { method: 'DELETE' })
+    setConfirmDelete(false)
     setExists(false)
     setFileUrl(null)
     setUploadedName('')
@@ -134,12 +136,8 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
                 >
                   ⬇ Descargar
                 </button>
-                <label className="px-4 py-2 border border-[#2a2a2a] text-[#9ca3af] text-sm font-semibold rounded-lg hover:border-[#dc2626] hover:text-white transition-colors cursor-pointer">
-                  {loading ? 'Subiendo...' : 'Reemplazar'}
-                  <input type="file" accept=".pdf" className="hidden" onChange={onInputChange} disabled={loading} />
-                </label>
                 <button
-                  onClick={handleRemove}
+                  onClick={() => setConfirmDelete(true)}
                   className="px-3 py-2 border border-red-900/40 text-red-500 text-sm rounded-lg hover:bg-red-900/20 transition-colors"
                   title="Eliminar archivo"
                 >
@@ -198,6 +196,46 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
           ⚠ {error}
         </motion.p>
       )}
+
+      {/* Confirmation modal */}
+      <AnimatePresence>
+        {confirmDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', duration: 0.3, bounce: 0.2 }}
+              className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+            >
+              <div className="text-3xl mb-3">🗑️</div>
+              <h4 className="text-white font-bold text-lg mb-2">¿Eliminar archivo?</h4>
+              <p className="text-[#9ca3af] text-sm mb-6 leading-relaxed">
+                Esta acción no se puede deshacer. El archivo <span className="text-white font-medium">{uploadedName || title}</span> será eliminado permanentemente.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="flex-1 px-4 py-2.5 border border-[#2a2a2a] text-[#9ca3af] text-sm font-semibold rounded-xl hover:border-[#444] hover:text-white transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleRemove}
+                  className="flex-1 px-4 py-2.5 bg-red-700 text-white text-sm font-semibold rounded-xl hover:bg-red-600 transition-colors"
+                >
+                  Sí, eliminar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
