@@ -16,13 +16,11 @@ app.use('/uploads', express.static(UPLOADS_DIR))
 const MIME_TO_EXT = {
   'application/pdf': 'pdf',
   'application/msword': 'doc',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'application/vnd.ms-word': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
 }
 
 const EXT_TO_EXT = { '.pdf': 'pdf', '.doc': 'doc', '.docx': 'docx' }
-
-const ALL_EXTS = ['pdf', 'doc', 'docx']
 
 function resolveExt(file) {
   if (MIME_TO_EXT[file.mimetype]) return MIME_TO_EXT[file.mimetype]
@@ -30,11 +28,22 @@ function resolveExt(file) {
   return EXT_TO_EXT[dotExt] || null
 }
 
+function sanitizeFilename(name) {
+  return name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/_{2,}/g, '_').trim() || 'documento'
+}
+
+function findFile(key) {
+  const files = fs.readdirSync(UPLOADS_DIR)
+  return files.find((f) => f.startsWith(`${key}__`)) || null
+}
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => {
     const ext = resolveExt(file) || 'pdf'
-    cb(null, `${req.params.key}.${ext}`)
+    let safe = sanitizeFilename(file.originalname)
+    if (!safe.toLowerCase().endsWith(`.${ext}`)) safe = `${safe}.${ext}`
+    cb(null, `${req.params.key}__${safe}`)
   },
 })
 
@@ -47,28 +56,32 @@ const upload = multer({
 })
 
 app.post('/api/upload/:key', (req, res) => {
+  // Delete any existing file for this key before saving new one
+  const existing = findFile(req.params.key)
+  if (existing) fs.unlinkSync(path.join(UPLOADS_DIR, existing))
+
   upload.single('file')(req, res, (err) => {
     if (err) return res.status(400).json({ error: err.message })
     if (!req.file) return res.status(400).json({ error: 'No se recibió archivo' })
     const ext = resolveExt(req.file) || 'pdf'
-    res.json({ ok: true, url: `/uploads/${req.params.key}.${ext}`, name: req.file.originalname, ext })
+    const originalName = req.file.filename.replace(`${req.params.key}__`, '')
+    res.json({ ok: true, url: `/uploads/${req.file.filename}`, name: originalName, ext })
   })
 })
 
 app.delete('/api/upload/:key', (req, res) => {
-  for (const ext of ALL_EXTS) {
-    const filepath = path.join(UPLOADS_DIR, `${req.params.key}.${ext}`)
-    if (fs.existsSync(filepath)) fs.unlinkSync(filepath)
-  }
+  const files = fs.readdirSync(UPLOADS_DIR)
+  files.filter((f) => f.startsWith(`${req.params.key}__`))
+    .forEach((f) => fs.unlinkSync(path.join(UPLOADS_DIR, f)))
   res.json({ ok: true })
 })
 
 app.get('/api/file/:key', (req, res) => {
-  for (const ext of ALL_EXTS) {
-    const filepath = path.join(UPLOADS_DIR, `${req.params.key}.${ext}`)
-    if (fs.existsSync(filepath)) {
-      return res.json({ exists: true, url: `/uploads/${req.params.key}.${ext}`, ext })
-    }
+  const match = findFile(req.params.key)
+  if (match) {
+    const originalName = match.replace(`${req.params.key}__`, '')
+    const ext = path.extname(originalName).slice(1) || 'pdf'
+    return res.json({ exists: true, url: `/uploads/${match}`, ext, name: originalName })
   }
   res.json({ exists: false, url: null })
 })

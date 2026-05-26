@@ -37,7 +37,6 @@ const aperturaItems = [
 
 const normativaItems = [
   { title: 'Tipos de contrato',                          storageKey: 'vincular_tipos_contrato' },
-  { title: 'Vacaciones',                                 storageKey: 'vincular_vacaciones' },
   { title: 'Vacaciones — Cartilla y formatos',           storageKey: 'vincular_cartilla_vacaciones' },
   { title: 'Dotación y EPP — Cartilla',                  storageKey: 'vincular_dotacion_epp' },
   { title: 'Maternidad — Cartilla y formatos',           storageKey: 'vincular_maternidad' },

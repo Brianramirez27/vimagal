@@ -40,7 +40,7 @@ function DocSlot({ slotKey, slotLabel }: SlotProps) {
         if (data.exists) {
           setFileUrl(data.url)
           setFileExt(data.ext ?? 'pdf')
-          setFileName(slotKey)
+          setFileName(data.name ?? slotKey)
         }
       })
       .catch(() => setExists(false))
@@ -97,9 +97,12 @@ function DocSlot({ slotKey, slotLabel }: SlotProps) {
 
   const handleDownload = () => {
     if (!fileUrl) return
+    const baseName = fileName.includes('.')
+      ? fileName.slice(0, fileName.lastIndexOf('.'))
+      : fileName || slotKey
     const link = document.createElement('a')
     link.href = fileUrl
-    link.download = `${slotKey}.${fileExt}`
+    link.download = `${baseName} - ${slotLabel}.${fileExt}`
     link.click()
   }
 

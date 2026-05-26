@@ -1,15 +1,14 @@
 import { list } from '@vercel/blob'
 
-const ALL_EXTS = ['pdf', 'doc', 'docx']
-
 export default async function handler(req, res) {
   const { key } = req.query
   try {
-    const { blobs } = await list({ prefix: `${key}.` })
-    const blob = blobs.find((b) => ALL_EXTS.some((e) => b.pathname === `${key}.${e}`))
+    const { blobs } = await list({ prefix: `${key}__` })
+    const blob = blobs.find((b) => b.pathname.startsWith(`${key}__`))
     if (blob) {
-      const ext = blob.pathname.split('.').pop()
-      res.json({ exists: true, url: `/api/pdf/${key}`, ext })
+      const originalName = blob.pathname.slice(`${key}__`.length)
+      const ext = originalName.slice(originalName.lastIndexOf('.') + 1) || 'pdf'
+      res.json({ exists: true, url: `/api/pdf/${key}`, ext, name: originalName })
     } else {
       res.json({ exists: false, url: null })
     }

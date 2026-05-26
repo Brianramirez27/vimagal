@@ -10,8 +10,6 @@ const MIME_TO_EXT = {
 
 const EXT_TO_EXT = { '.pdf': 'pdf', '.doc': 'doc', '.docx': 'docx' }
 
-const ALL_EXTS = ['pdf', 'doc', 'docx']
-
 function resolveExt(mimeType, filename) {
   if (MIME_TO_EXT[mimeType]) return MIME_TO_EXT[mimeType]
   if (filename) {
@@ -21,13 +19,16 @@ function resolveExt(mimeType, filename) {
   return null
 }
 
+function sanitizeFilename(name) {
+  return name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/_{2,}/g, '_').trim() || 'documento'
+}
+
 export default async function handler(req, res) {
   const { key } = req.query
 
   if (req.method === 'POST') {
     return new Promise((resolve) => {
       let bb
-
       try {
         bb = busboy({ headers: req.headers })
       } catch (err) {
@@ -60,17 +61,21 @@ export default async function handler(req, res) {
             return resolve()
           }
 
-          // Delete any existing file for this key (any extension)
-          const { blobs } = await list({ prefix: `${key}.` })
-          const existing = blobs.filter((b) => ALL_EXTS.some((e) => b.pathname === `${key}.${e}`))
+          // Ensure filename has the correct extension
+          let safeName = sanitizeFilename(filename || `documento.${ext}`)
+          if (!safeName.toLowerCase().endsWith(`.${ext}`)) safeName = `${safeName}.${ext}`
+
+          // Delete any existing file for this key
+          const { blobs } = await list({ prefix: `${key}__` })
+          const existing = blobs.filter((b) => b.pathname.startsWith(`${key}__`))
           if (existing.length > 0) await del(existing.map((b) => b.url))
 
-          await put(`${key}.${ext}`, fileBuffer, {
+          await put(`${key}__${safeName}`, fileBuffer, {
             access: 'private',
             contentType: mimeType,
           })
 
-          res.json({ ok: true, url: `/api/pdf/${key}`, name: filename, ext })
+          res.json({ ok: true, url: `/api/pdf/${key}`, name: safeName, ext })
           resolve()
         } catch (err) {
           console.error('[upload] error:', err.message)
@@ -88,8 +93,8 @@ export default async function handler(req, res) {
     })
   } else if (req.method === 'DELETE') {
     try {
-      const { blobs } = await list({ prefix: `${key}.` })
-      const existing = blobs.filter((b) => ALL_EXTS.some((e) => b.pathname === `${key}.${e}`))
+      const { blobs } = await list({ prefix: `${key}__` })
+      const existing = blobs.filter((b) => b.pathname.startsWith(`${key}__`))
       if (existing.length > 0) await del(existing.map((b) => b.url))
       res.json({ ok: true })
     } catch (err) {
