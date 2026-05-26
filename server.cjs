@@ -13,16 +13,36 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 
 app.use('/uploads', express.static(UPLOADS_DIR))
 
+const MIME_TO_EXT = {
+  'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.ms-word': 'doc',
+}
+
+const EXT_TO_EXT = { '.pdf': 'pdf', '.doc': 'doc', '.docx': 'docx' }
+
+const ALL_EXTS = ['pdf', 'doc', 'docx']
+
+function resolveExt(file) {
+  if (MIME_TO_EXT[file.mimetype]) return MIME_TO_EXT[file.mimetype]
+  const dotExt = path.extname(file.originalname).toLowerCase()
+  return EXT_TO_EXT[dotExt] || null
+}
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-  filename: (req, _file, cb) => cb(null, `${req.params.key}.pdf`),
+  filename: (req, file, cb) => {
+    const ext = resolveExt(file) || 'pdf'
+    cb(null, `${req.params.key}.${ext}`)
+  },
 })
 
 const upload = multer({
   storage,
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === 'application/pdf') cb(null, true)
-    else cb(new Error('Solo se permiten archivos PDF'))
+    if (resolveExt(file)) cb(null, true)
+    else cb(new Error('Solo se permiten archivos PDF o Word (.doc, .docx)'))
   },
 })
 
@@ -30,20 +50,27 @@ app.post('/api/upload/:key', (req, res) => {
   upload.single('file')(req, res, (err) => {
     if (err) return res.status(400).json({ error: err.message })
     if (!req.file) return res.status(400).json({ error: 'No se recibió archivo' })
-    res.json({ ok: true, url: `/uploads/${req.params.key}.pdf`, name: req.file.originalname })
+    const ext = resolveExt(req.file) || 'pdf'
+    res.json({ ok: true, url: `/uploads/${req.params.key}.${ext}`, name: req.file.originalname, ext })
   })
 })
 
 app.delete('/api/upload/:key', (req, res) => {
-  const filepath = path.join(UPLOADS_DIR, `${req.params.key}.pdf`)
-  if (fs.existsSync(filepath)) fs.unlinkSync(filepath)
+  for (const ext of ALL_EXTS) {
+    const filepath = path.join(UPLOADS_DIR, `${req.params.key}.${ext}`)
+    if (fs.existsSync(filepath)) fs.unlinkSync(filepath)
+  }
   res.json({ ok: true })
 })
 
 app.get('/api/file/:key', (req, res) => {
-  const filepath = path.join(UPLOADS_DIR, `${req.params.key}.pdf`)
-  const exists = fs.existsSync(filepath)
-  res.json({ exists, url: exists ? `/uploads/${req.params.key}.pdf` : null })
+  for (const ext of ALL_EXTS) {
+    const filepath = path.join(UPLOADS_DIR, `${req.params.key}.${ext}`)
+    if (fs.existsSync(filepath)) {
+      return res.json({ exists: true, url: `/uploads/${req.params.key}.${ext}`, ext })
+    }
+  }
+  res.json({ exists: false, url: null })
 })
 
 // eslint-disable-next-line no-unused-vars

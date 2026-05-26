@@ -1,36 +1,54 @@
 import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-interface PdfUploaderProps {
-  storageKey: string
-  title: string
+const ACCEPTED_MIME = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.ms-word',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/octet-stream',
+]
+
+const ACCEPTED_EXTS = ['.pdf', '.doc', '.docx']
+
+function isAccepted(file: File) {
+  if (ACCEPTED_MIME.includes(file.type)) return true
+  const dotExt = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+  return ACCEPTED_EXTS.includes(dotExt)
 }
 
-export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
+interface SlotProps {
+  slotKey: string
+  slotLabel: string
+}
+
+function DocSlot({ slotKey, slotLabel }: SlotProps) {
   const [fileUrl, setFileUrl] = useState<string | null>(null)
+  const [fileExt, setFileExt] = useState<string>('pdf')
+  const [fileName, setFileName] = useState<string>('')
   const [exists, setExists] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
-  const [uploadedName, setUploadedName] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/file/${storageKey}`)
+    fetch(`/api/file/${slotKey}`)
       .then((r) => r.json())
       .then((data) => {
         setExists(data.exists)
         if (data.exists) {
           setFileUrl(data.url)
-          setUploadedName(storageKey)
+          setFileExt(data.ext ?? 'pdf')
+          setFileName(slotKey)
         }
       })
       .catch(() => setExists(false))
-  }, [storageKey])
+  }, [slotKey])
 
   const uploadFile = useCallback(async (file: File) => {
-    if (file.type !== 'application/pdf') {
-      setError('Solo se permiten archivos PDF.')
+    if (!isAccepted(file)) {
+      setError('Solo se permiten archivos PDF o Word (.doc, .docx).')
       return
     }
     setError(null)
@@ -38,28 +56,29 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
     const form = new FormData()
     form.append('file', file)
     try {
-      const res = await fetch(`/api/upload/${storageKey}`, { method: 'POST', body: form })
+      const res = await fetch(`/api/upload/${slotKey}`, { method: 'POST', body: form })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Error al subir el archivo')
       }
       const data = await res.json()
       setFileUrl(data.url)
-      setUploadedName(data.name ?? file.name)
+      setFileExt(data.ext ?? 'pdf')
+      setFileName(data.name ?? file.name)
       setExists(true)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar el archivo.')
     } finally {
       setLoading(false)
     }
-  }, [storageKey])
+  }, [slotKey])
 
   const handleRemove = async () => {
-    await fetch(`/api/upload/${storageKey}`, { method: 'DELETE' })
+    await fetch(`/api/upload/${slotKey}`, { method: 'DELETE' })
     setConfirmDelete(false)
     setExists(false)
     setFileUrl(null)
-    setUploadedName('')
+    setFileName('')
     setError(null)
   }
 
@@ -80,22 +99,20 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
     if (!fileUrl) return
     const link = document.createElement('a')
     link.href = fileUrl
-    link.download = `${storageKey}.pdf`
+    link.download = `${slotKey}.${fileExt}`
     link.click()
   }
 
-  return (
-    <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
-      <h3 className="text-white font-bold text-xl mb-6 flex items-center gap-2">
-        <span className="w-1 h-6 bg-[#dc2626] rounded-full" />
-        {title}
-      </h3>
+  const isPdf = fileExt === 'pdf'
 
-      {/* Checking state */}
+  return (
+    <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 flex flex-col gap-3">
+      <p className="text-[#9ca3af] text-xs font-semibold uppercase tracking-wider">{slotLabel}</p>
+
       {exists === null && (
-        <div className="flex items-center justify-center py-16 gap-3">
-          <div className="w-6 h-6 border-2 border-[#dc2626] border-t-transparent rounded-full animate-spin" />
-          <span className="text-[#9ca3af] text-sm">Verificando archivo...</span>
+        <div className="flex items-center justify-center py-8 gap-3">
+          <div className="w-5 h-5 border-2 border-[#dc2626] border-t-transparent rounded-full animate-spin" />
+          <span className="text-[#9ca3af] text-xs">Verificando...</span>
         </div>
       )}
 
@@ -103,43 +120,44 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
         {exists === true && (
           <motion.div
             key="stored"
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-4"
+            exit={{ opacity: 0, y: -8 }}
+            className="space-y-3"
           >
-            {/* PDF embed */}
-            <div className="rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#222]" style={{ height: '440px' }}>
-              <iframe
-                src={fileUrl ?? ''}
-                className="w-full h-full"
-                title={title}
-              />
-            </div>
+            {isPdf ? (
+              <div
+                className="rounded-lg overflow-hidden border border-[#2a2a2a] bg-[#222]"
+                style={{ height: '300px' }}
+              >
+                <iframe src={fileUrl ?? ''} className="w-full h-full" title={slotLabel} />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-3 py-8 bg-[#222] rounded-lg border border-[#2a2a2a]">
+                <span className="text-5xl">📝</span>
+                <p className="text-[#9ca3af] text-xs text-center px-4 truncate max-w-full">{fileName}</p>
+              </div>
+            )}
 
-            {/* File info + actions */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#222] rounded-xl px-4 py-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="text-2xl">📄</span>
-                <div className="min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{uploadedName || title}</p>
-                  <p className="text-[#22c55e] text-xs flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] inline-block" />
-                    Guardado en el proyecto
-                  </p>
-                </div>
+            <div className="flex items-center justify-between gap-2 bg-[#222] rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span>{isPdf ? '📄' : '📝'}</span>
+                <p className="text-[#22c55e] text-xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] inline-block" />
+                  Guardado
+                </p>
               </div>
               <div className="flex gap-2 shrink-0">
                 <button
                   onClick={handleDownload}
-                  className="px-4 py-2 bg-[#dc2626] text-white text-sm font-semibold rounded-lg hover:bg-[#ef4444] transition-colors flex items-center gap-2"
+                  className="px-3 py-1.5 bg-[#dc2626] text-white text-xs font-semibold rounded-lg hover:bg-[#ef4444] transition-colors flex items-center gap-1.5"
                 >
                   ⬇ Descargar
                 </button>
                 <button
                   onClick={() => setConfirmDelete(true)}
-                  className="px-3 py-2 border border-red-900/40 text-red-500 text-sm rounded-lg hover:bg-red-900/20 transition-colors"
-                  title="Eliminar archivo"
+                  className="px-2 py-1.5 border border-red-900/40 text-red-500 text-xs rounded-lg hover:bg-red-900/20 transition-colors"
+                  title="Eliminar"
                 >
                   ✕
                 </button>
@@ -151,12 +169,12 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
         {exists === false && (
           <motion.div
             key="upload"
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            exit={{ opacity: 0, y: -8 }}
           >
             <label
-              className={`block rounded-xl border-2 border-dashed p-10 text-center cursor-pointer transition-colors duration-300 ${
+              className={`block rounded-lg border-2 border-dashed p-6 text-center cursor-pointer transition-colors duration-300 ${
                 drag
                   ? 'border-[#dc2626] bg-[#dc2626]/10'
                   : 'border-[#2a2a2a] hover:border-[#dc2626]/60 hover:bg-[#dc2626]/5'
@@ -165,21 +183,27 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
               onDragLeave={() => setDrag(false)}
               onDrop={onDrop}
             >
-              <input type="file" accept=".pdf" className="hidden" onChange={onInputChange} disabled={loading} />
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx"
+                className="hidden"
+                onChange={onInputChange}
+                disabled={loading}
+              />
               {loading ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-10 h-10 border-2 border-[#dc2626] border-t-transparent rounded-full animate-spin" />
-                  <p className="text-[#9ca3af] text-sm">Subiendo archivo al proyecto...</p>
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-8 h-8 border-2 border-[#dc2626] border-t-transparent rounded-full animate-spin" />
+                  <p className="text-[#9ca3af] text-xs">Subiendo...</p>
                 </div>
               ) : (
                 <>
-                  <div className="text-5xl mb-4">📂</div>
-                  <p className="text-white font-semibold mb-1">Arrastra tu PDF aquí</p>
-                  <p className="text-[#9ca3af] text-sm mb-4">o haz clic para seleccionar</p>
-                  <span className="px-4 py-2 bg-[#dc2626] text-white text-sm font-semibold rounded-lg">
-                    Seleccionar PDF
+                  <div className="text-3xl mb-2">📂</div>
+                  <p className="text-white text-sm font-semibold mb-1">Arrastra aquí</p>
+                  <p className="text-[#9ca3af] text-xs mb-3">o haz clic para seleccionar</p>
+                  <span className="px-3 py-1.5 bg-[#dc2626] text-white text-xs font-semibold rounded-lg">
+                    Seleccionar archivo
                   </span>
-                  <p className="text-[#9ca3af]/60 text-xs mt-4">Sin límite de tamaño · Solo PDF · Se guarda en el proyecto</p>
+                  <p className="text-[#9ca3af]/60 text-xs mt-3">PDF · Word (.doc · .docx)</p>
                 </>
               )}
             </label>
@@ -191,13 +215,12 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="mt-3 text-red-400 text-sm flex items-center gap-2"
+          className="text-red-400 text-xs flex items-center gap-1.5"
         >
           ⚠ {error}
         </motion.p>
       )}
 
-      {/* Confirmation modal */}
       <AnimatePresence>
         {confirmDelete && (
           <motion.div
@@ -216,7 +239,9 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
               <div className="text-3xl mb-3">🗑️</div>
               <h4 className="text-white font-bold text-lg mb-2">¿Eliminar archivo?</h4>
               <p className="text-[#9ca3af] text-sm mb-6 leading-relaxed">
-                Esta acción no se puede deshacer. El archivo <span className="text-white font-medium">{uploadedName || title}</span> será eliminado permanentemente.
+                Esta acción no se puede deshacer. El archivo{' '}
+                <span className="text-white font-medium">{fileName || slotLabel}</span> será eliminado
+                permanentemente.
               </p>
               <div className="flex gap-3">
                 <button
@@ -236,6 +261,26 @@ export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+interface PdfUploaderProps {
+  storageKey: string
+  title: string
+}
+
+export default function PdfUploader({ storageKey, title }: PdfUploaderProps) {
+  return (
+    <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
+      <h3 className="text-white font-bold text-xl mb-6 flex items-center gap-2">
+        <span className="w-1 h-6 bg-[#dc2626] rounded-full" />
+        {title}
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <DocSlot slotKey={storageKey} slotLabel="Documento 1" />
+        <DocSlot slotKey={`${storageKey}_2`} slotLabel="Documento 2" />
+      </div>
     </div>
   )
 }

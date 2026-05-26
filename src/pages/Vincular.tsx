@@ -10,18 +10,18 @@ import Footer from '../components/Footer'
 const introItems = [
   {
     icon: '🎯',
-    title: 'Objetivo de la Evaluación de Desempeño',
-    desc: 'Establecer un proceso sistemático y objetivo para medir el rendimiento de los colaboradores frente a las metas organizacionales, identificar fortalezas y áreas de mejora, y tomar decisiones informadas sobre desarrollo, compensación y sucesión.',
+    title: 'Objetivo',
+    desc: 'Fortalecer el proceso de vinculación del talento humano de la empresa VIMAGAL mediante el diseño e implementación de herramientas, formatos y material de apoyo que permitan optimizar la gestión documental, orientar los procesos de contratación y garantizar un ingreso organizado del personal, contribuyendo al cumplimiento de la normatividad laboral y al mejoramiento de la gestión del talento humano dentro de la organización.',
   },
   {
     icon: '🔭',
     title: 'Alcance',
-    desc: 'Este sistema aplica a todos los colaboradores de Pyme Número 2, independientemente de su área o nivel jerárquico. Comprende la evaluación de competencias, resultados cuantitativos, comportamientos organizacionales y metas individuales acordadas al inicio del período.',
+    desc: 'Fortalecer los procesos relacionados con la vinculación del talento humano, promoviendo una gestión más organizada, eficiente y alineada con los lineamientos laborales, que facilite el adecuado ingreso del personal y contribuya al mejoramiento organizacional de VIMAGAL.',
   },
   {
     icon: '🏆',
-    title: 'Importancia para la Organización',
-    desc: 'La evaluación de desempeño es el pilar que permite alinear el talento humano con la estrategia corporativa, fomentar una cultura de retroalimentación continua, impulsar el crecimiento profesional y garantizar que cada persona contribuya al éxito colectivo de la organización.',
+    title: 'Importancia',
+    desc: 'La importancia de este proceso radica en que permite que la empresa Vimagal cuente con personal idóneo y correctamente vinculado, garantizando el cumplimiento de las normas laborales y el buen ambiente de trabajo. Además, ayuda a mantener el orden en la documentación, prevenir situaciones de acoso laboral o sexual y asegurar que tanto la empresa como los trabajadores conozcan sus derechos y deberes desde el inicio de la relación laboral.',
   },
 ]
 
