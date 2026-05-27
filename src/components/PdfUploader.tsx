@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { upload } from '@vercel/blob/client'
 
 const ACCEPTED_MIME = [
   'application/pdf',
@@ -11,10 +12,29 @@ const ACCEPTED_MIME = [
 
 const ACCEPTED_EXTS = ['.pdf', '.doc', '.docx']
 
+const MIME_TO_EXT: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.ms-word': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+}
+
+const EXT_MAP: Record<string, string> = { '.pdf': 'pdf', '.doc': 'doc', '.docx': 'docx' }
+
 function isAccepted(file: File) {
   if (ACCEPTED_MIME.includes(file.type)) return true
   const dotExt = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
   return ACCEPTED_EXTS.includes(dotExt)
+}
+
+function resolveExt(file: File): string {
+  if (MIME_TO_EXT[file.type]) return MIME_TO_EXT[file.type]
+  const dotExt = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+  return EXT_MAP[dotExt] || 'pdf'
+}
+
+function sanitizeForBlob(name: string): string {
+  return name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/_{2,}/g, '_').trim() || 'documento'
 }
 
 interface SlotProps {
@@ -53,18 +73,22 @@ function DocSlot({ slotKey, slotLabel }: SlotProps) {
     }
     setError(null)
     setLoading(true)
-    const form = new FormData()
-    form.append('file', file)
     try {
-      const res = await fetch(`/api/upload/${slotKey}`, { method: 'POST', body: form })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Error al subir el archivo')
-      }
-      const data = await res.json()
-      setFileUrl(data.url)
-      setFileExt(data.ext ?? 'pdf')
-      setFileName(data.name ?? file.name)
+      const ext = resolveExt(file)
+      let safeName = sanitizeForBlob(file.name)
+      if (!safeName.toLowerCase().endsWith(`.${ext}`)) safeName = `${safeName}.${ext}`
+
+      // Subida directa al blob store desde el navegador (sin pasar por la función serverless)
+      // Esto evita el límite de 4.5 MB de Vercel Functions
+      await upload(`${slotKey}__${safeName}`, file, {
+        access: 'private',
+        handleUploadUrl: `/api/upload-client/${slotKey}`,
+        multipart: true,
+      })
+
+      setFileUrl(`/api/pdf/${slotKey}`)
+      setFileExt(ext)
+      setFileName(safeName)
       setExists(true)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar el archivo.')
